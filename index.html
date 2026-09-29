@@ -248,6 +248,15 @@ select:focus,.input:focus{border-color:var(--accent);outline:none}
 .ch-dot{fill:var(--surface);stroke-width:3}
 .rate-date{display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--muted);font-size:.95rem}
 .rate-note{color:var(--muted);font-size:.85rem;margin:10px 4px 0}
+
+/* Comprobante de la operación */
+.rcp-overlay{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.72);display:flex;align-items:stretch;justify-content:center}
+.rcp-sheet{width:min(100%,520px);display:flex;flex-direction:column;background:var(--bg);padding:12px 12px 14px}
+.rcp-body{flex:1;overflow-y:auto;border-radius:14px;background:#fff}
+.rcp-body img{display:block;width:100%;height:auto}
+.rcp-body .hint{padding:24px;color:#333}
+.rcp-actions{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;margin-top:10px}
+.rcp-hint{text-align:center;margin:8px 0 0}
 </style>
 </head>
 <body>
@@ -504,6 +513,24 @@ const Core = (function () {
     result_low_amount: { es: "Este monto es menor al mínimo recomendado (mínimo {min}). Si continúas, se aplica una comisión del {newPct}% en lugar del {oldPct}%.",
       pt: "Este valor é menor que o mínimo recomendado (mínimo {min}). Se continuar, será aplicada uma comissão de {newPct}% em vez de {oldPct}%.",
       en: "This amount is below the recommended minimum (minimum {min}). If you continue, a {newPct}% fee applies instead of {oldPct}%." },
+    rcp_button: { es: "🧾 Ver comprobante", pt: "🧾 Ver comprovante", en: "🧾 View receipt" },
+    rcp_title: { es: "Comprobante de operación", pt: "Comprovante de operação", en: "Transaction receipt" },
+    rcp_date: { es: "Fecha", pt: "Data", en: "Date" },
+    rcp_status: { es: "Estado", pt: "Status", en: "Status" },
+    rcp_total: { es: "Total pagado", pt: "Total pago", en: "Total paid" },
+    rcp_method: { es: "Método de pago", pt: "Método de pagamento", en: "Payment method" },
+    rcp_rate: { es: "Tasa usada", pt: "Taxa usada", en: "Rate used" },
+    rcp_beneficiary: { es: "Beneficiario", pt: "Beneficiário", en: "Beneficiary" },
+    rcp_note: { es: "Este comprobante confirma que tu solicitud fue registrada. El envío se completa una vez verificado el pago.", pt: "Este comprovante confirma que sua solicitação foi registrada. O envio é concluído após a verificação do pagamento.", en: "This receipt confirms your request was registered. The transfer is completed once the payment is verified." },
+    rcp_note_done: { es: "Operación completada. ¡Gracias por tu confianza!", pt: "Operação concluída. Obrigado pela confiança!", en: "Transaction completed. Thank you for your trust!" },
+    rcp_contact: { es: "Consultas por WhatsApp: {phone}", pt: "Dúvidas pelo WhatsApp: {phone}", en: "Questions on WhatsApp: {phone}" },
+    rcp_generated: { es: "Generado el {date}", pt: "Gerado em {date}", en: "Generated on {date}" },
+    rcp_save: { es: "Guardar", pt: "Salvar", en: "Save" },
+    rcp_share: { es: "Compartir", pt: "Compartilhar", en: "Share" },
+    rcp_close: { es: "Cerrar", pt: "Fechar", en: "Close" },
+    rcp_hint: { es: "También puedes tomar una captura de pantalla.", pt: "Você também pode tirar um print da tela.", en: "You can also take a screenshot." },
+    rcp_saved_web: { es: "Imagen descargada", pt: "Imagem baixada", en: "Image downloaded" },
+    rcp_err: { es: "No se pudo generar el comprobante.", pt: "Não foi possível gerar o comprovante.", en: "Couldn't generate the receipt." },
     menu_calc: { es: "Calculadora", pt: "Calculadora", en: "Calculator" },
     menu_title: { es: "Menú", pt: "Menu", en: "Menu" },
     menu_open: { es: "Abrir menú", pt: "Abrir menu", en: "Open menu" },
@@ -1959,6 +1986,7 @@ if (typeof module !== "undefined") module.exports = Core;
 
   window.RemesasCalc = {
     renderCalc, getLang: () => ui.lang,
+    getBusiness: () => ({ name: STATE.business.name || "Remesas", logo: /^data:image\//.test(STATE.business.logo || "") ? STATE.business.logo : "" }),
     // Deja la calculadora lista para una cotización nueva (se usa al volver de una operación).
     reset: () => { ui.amount = ""; ui.quote = null; ui.error = null; }
   };
@@ -2756,9 +2784,11 @@ function screenDone(app) {
         <strong style="display:block;font-family:var(--display);font-size:2.2rem;margin:6px 0">${opNum(op.number)}</strong>
         <p class="hint">${esc(tt("ops_d_message"))}</p>
         <a class="wa" href="${esc(OFFICIAL_WA + "?text=" + encodeURIComponent(adminSummaryText(op)))}" target="_blank" rel="noopener">${esc(tt("ops_d_share"))}</a>
-        <button class="ghost" id="d-mine" style="margin-top:14px;width:100%">${esc(tt("ops_d_myops"))}</button>
+        <button class="ghost" id="d-receipt" style="margin-top:14px;width:100%">${esc(tt("rcp_button"))}</button>
+        <button class="ghost" id="d-mine" style="margin-top:10px;width:100%">${esc(tt("ops_d_myops"))}</button>
         <button class="link-btn" id="d-calc">${esc(tt("ops_d_calc"))}</button>
       </div>`;
+    $("#d-receipt").onclick = () => openReceipt(op);
     $("#d-mine").onclick = () => go("myops");
     $("#d-calc").onclick = exitToCalc;
   }
@@ -2898,8 +2928,10 @@ function screenDone(app) {
           ${o.receipt ? `<button class="ghost" style="width:100%" id="mod-view-receipt">${esc(tt("ops_mod_view_receipt"))}</button>` : ""}
           ${TERMINAL.indexOf(o.status) !== -1 && o.transferReceipt ? `<button class="ghost" style="width:100%" id="mod-view-transfer">${esc(tt("ops_mod_view_transfer"))}</button>` : ""}
           <a class="wa" href="${esc(OFFICIAL_WA + "?text=" + encodeURIComponent(adminSummaryText(o)))}" target="_blank" rel="noopener">${esc(tt("ops_mod_share"))}</a>
+          ${getBeneficiaries(o) && o.status !== "CANCELLED" && o.status !== "REJECTED" ? `<button class="ghost" style="width:100%" id="mod-receipt">${esc(tt("rcp_button"))}</button>` : ""}
         </div>
         <div class="card"><h3 style="margin-top:0">${esc(tt("ops_mod_history"))}</h3>${historyList(o.history, true)}</div>`;
+      if ($("#mod-receipt")) $("#mod-receipt").onclick = () => openReceipt(o);
       if ($("#mod-view-receipt")) $("#mod-view-receipt").onclick = () => openImagePreview(o.receipt.url);
       if ($("#mod-view-transfer")) $("#mod-view-transfer").onclick = () => openImagePreview(o.transferReceipt.url);
     }, (e) => { console.error("detalle operación:", e); $("#mod-body").innerHTML = `<div class="alert">${esc(friendlyError(e))}</div>`; });
@@ -3065,6 +3097,147 @@ function screenDone(app) {
   }
 
   const ACCOUNT_TYPES = { BR: ["pix"], VE: ["pago_movil", "transferencia"], AR: ["transferencia", "psp"], ZL: ["zelle"], UT: ["usdt_wallet", "usdt_id"] };
+
+  /* ---------- Comprobante de la operación (imagen PNG que el cliente guarda o comparte) ---------- */
+  const RCP_SENSITIVE = ["pixKey", "accountNumber", "cbu", "cvu", "aliasCvu", "alias", "walletAddress", "userId", "docNumber", "phone", "contactValue"];
+  const maskTail = (v) => { const s = String(v || ""); return s.length <= 4 ? s : "••••" + s.slice(-4); }; // no se muestran datos completos en una imagen que se puede compartir
+  function rcpNum(x) { try { return C.formatNumber(new Decimal(x), 2); } catch (e) { return String(x); } }
+
+  function receiptData(o) {
+    const L = lang(), biz = (window.RemesasCalc && window.RemesasCalc.getBusiness && window.RemesasCalc.getBusiness()) || { name: "Remesas", logo: "" };
+    const cn = (id) => COUNTRY_FLAG[id] + " " + C.countryNameFor(id, COUNTRY_NAME[id], L);
+    const a = o.amounts, r = o.route;
+    const rows = [[tt("ops_v_route"), cn(r.from) + "  →  " + cn(r.to)], [tt("ops_v_sends"), rcpNum(a.send) + " " + r.fromCurrency]];
+    if (a.hasFee) {
+      const pct = a.appliedPercent !== undefined ? " (" + C.formatRate(a.appliedPercent).replace(/,00$/, "") + "%)" : "";
+      rows.push([tt("result_commission") + pct + (a.feeIncluded ? " " + tt("result_included") : ""), rcpNum(a.fee) + " " + r.fromCurrency]);
+    }
+    rows.push([tt("rcp_total"), rcpNum(a.total) + " " + r.fromCurrency]);
+    if (o.rateSnapshot && o.rateSnapshot.rate && o.rateSnapshot.rate.text) rows.push([tt("rcp_rate"), o.rateSnapshot.rate.text]);
+    if (o.payMethod) rows.push([tt("rcp_method"), methodLabelT(o.payMethod)]);
+    const bens = (getBeneficiaries(o) || []).map((b) => {
+      const f = b.fields || {}, k = RCP_SENSITIVE.find((x) => f[x]);
+      return { name: f.fullName || f.holderName || "", method: methodLabelT(b.method), detail: k ? fieldLabelT(k) + ": " + maskTail(f[k]) : "", amount: bens_amount(b, r) };
+    });
+    const t = tsMillis(o.createdAt) || Date.now();
+    const digits = OFFICIAL_WA.replace(/\D/g, "");
+    return {
+      biz, title: tt("rcp_title"), number: opNum(o.number), date: new Date(t).toLocaleString(L),
+      status: statusLabelT(o.status), done: o.status === "COMPLETED",
+      rows, receive: [tt("ops_v_receives"), rcpNum(a.receive) + " " + r.toCurrency],
+      benTitle: tt("rcp_beneficiary"), bens, multi: bens.length > 1,
+      note: o.status === "COMPLETED" ? tt("rcp_note_done") : tt("rcp_note"),
+      contact: digits ? tt("rcp_contact", { phone: "+" + digits }) : "", generated: tt("rcp_generated", { date: new Date().toLocaleString(L) })
+    };
+  }
+  function bens_amount(b, r) { return b.amount !== undefined && b.amount !== "" ? rcpNum(b.amount) + " " + r.toCurrency : ""; }
+
+  function rcpWrap(ctx, text, maxW) {
+    const words = String(text).split(/\s+/), lines = []; let cur = "";
+    words.forEach((w) => { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
+    if (cur) lines.push(cur); return lines;
+  }
+  function rcpRoundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  /** Dibuja el comprobante y devuelve la altura usada. */
+  function drawReceipt(ctx, W, d, logo) {
+    const P = 56, CW = W - 2 * P, INK = "#10201A", MUTED = "#5B6B64", ACC = "#0B6E4F", LINE = "#DDE5E0";
+    const F = (w, s) => w + " " + s + "px system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, 4000);
+    // Encabezado
+    ctx.fillStyle = ACC; ctx.fillRect(0, 0, W, 210);
+    let tx = P;
+    if (logo) { const lh = 130, lw = Math.min(200, (logo.width / logo.height) * lh); ctx.fillStyle = "#fff"; rcpRoundRect(ctx, P, 40, lw + 20, lh + 20, 22); ctx.fill(); ctx.drawImage(logo, P + 10, 50, lw, lh); tx = P + lw + 50; }
+    ctx.fillStyle = "#fff"; ctx.textBaseline = "alphabetic";
+    ctx.font = F("700", 40); const tl = rcpWrap(ctx, d.title, W - tx - P); tl.forEach((ln, i) => ctx.fillText(ln, tx, 100 + i * 46));
+    ctx.font = F("500", 26); ctx.globalAlpha = 0.85; ctx.fillText(rcpWrap(ctx, d.biz.name, W - tx - P)[0] || "", tx, 100 + tl.length * 46 + 6); ctx.globalAlpha = 1;
+    // Número, fecha y estado
+    let y = 290;
+    ctx.fillStyle = INK; ctx.font = F("800", 68); ctx.fillText(d.number, P, y);
+    ctx.fillStyle = MUTED; ctx.font = F("500", 28); ctx.fillText(d.date, P, y + 46);
+    ctx.font = F("700", 26); const sw = ctx.measureText(d.status).width + 44;
+    ctx.fillStyle = d.done ? "#DDF3E7" : "#FFF1D6"; rcpRoundRect(ctx, W - P - sw, y - 46, sw, 52, 26); ctx.fill();
+    ctx.fillStyle = d.done ? ACC : "#8A5A00"; ctx.fillText(d.status, W - P - sw + 22, y - 10);
+    y += 90; ctx.fillStyle = LINE; ctx.fillRect(P, y, CW, 2); y += 22;
+    // Filas
+    d.rows.forEach((r) => {
+      ctx.font = F("500", 28); ctx.fillStyle = MUTED; const lab = rcpWrap(ctx, r[0], CW * 0.42);
+      ctx.font = F("700", 30); ctx.fillStyle = INK; const val = rcpWrap(ctx, r[1], CW * 0.56);
+      const n = Math.max(lab.length, val.length), h = 30 + n * 38;
+      ctx.font = F("500", 28); ctx.fillStyle = MUTED; lab.forEach((ln, i) => ctx.fillText(ln, P, y + 42 + i * 38));
+      ctx.font = F("700", 30); ctx.fillStyle = INK; ctx.textAlign = "right"; val.forEach((ln, i) => ctx.fillText(ln, W - P, y + 42 + i * 38)); ctx.textAlign = "left";
+      y += h + 6; ctx.fillStyle = LINE; ctx.fillRect(P, y, CW, 1); y += 6;
+    });
+    // Recibe (destacado)
+    y += 14; ctx.fillStyle = "#EAF6F0"; rcpRoundRect(ctx, P, y, CW, 110, 22); ctx.fill();
+    ctx.fillStyle = MUTED; ctx.font = F("600", 28); ctx.fillText(d.receive[0], P + 28, y + 66);
+    ctx.fillStyle = ACC; ctx.font = F("800", 42); ctx.textAlign = "right"; ctx.fillText(d.receive[1], W - P - 28, y + 70); ctx.textAlign = "left";
+    y += 110 + 40;
+    // Beneficiario(s)
+    if (d.bens.length) {
+      ctx.fillStyle = INK; ctx.font = F("800", 32); ctx.fillText(d.benTitle, P, y); y += 22;
+      d.bens.forEach((b, i) => {
+        y += 30; ctx.fillStyle = INK; ctx.font = F("700", 30);
+        const nm = (d.multi ? (i + 1) + ". " : "") + (b.name || b.method);
+        ctx.fillText(rcpWrap(ctx, nm, CW * 0.62)[0], P, y);
+        if (b.amount) { ctx.textAlign = "right"; ctx.fillStyle = ACC; ctx.fillText(b.amount, W - P, y); ctx.textAlign = "left"; }
+        y += 38; ctx.fillStyle = MUTED; ctx.font = F("500", 26);
+        const sub = [b.name ? b.method : "", b.detail].filter(Boolean).join("  ·  ");
+        if (sub) { rcpWrap(ctx, sub, CW).forEach((ln) => { ctx.fillText(ln, P, y); y += 34; }); }
+      });
+      y += 20;
+    }
+    // Nota y pie
+    ctx.fillStyle = LINE; ctx.fillRect(P, y, CW, 2); y += 40;
+    ctx.fillStyle = MUTED; ctx.font = F("500", 26);
+    rcpWrap(ctx, d.note, CW).forEach((ln) => { ctx.fillText(ln, P, y); y += 36; });
+    y += 30;
+    const fh = 140; ctx.fillStyle = "#F3F6F4"; ctx.fillRect(0, y, W, fh);
+    ctx.textAlign = "center"; ctx.fillStyle = INK; ctx.font = F("700", 28); if (d.contact) ctx.fillText(d.contact, W / 2, y + 56);
+    ctx.fillStyle = MUTED; ctx.font = F("500", 24); ctx.fillText(d.generated, W / 2, y + 100); ctx.textAlign = "left";
+    return y + fh;
+  }
+  function rcpLoadImage(src) { return new Promise((res) => { if (!src) return res(null); const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }); }
+  async function buildReceiptCanvas(o) {
+    const d = receiptData(o), logo = await rcpLoadImage(d.biz.logo), W = 900;
+    const probe = document.createElement("canvas"); probe.width = W; probe.height = 4000;
+    const H = Math.ceil(drawReceipt(probe.getContext("2d"), W, d, logo));
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    drawReceipt(cv.getContext("2d"), W, d, logo);
+    return cv;
+  }
+  function saveReceiptImage(canvas, url, fname) {
+    if (window.RemesasApp && window.RemesasApp.saveImage) { try { window.RemesasApp.saveImage(fname, url.split(",")[1]); return; } catch (e) { /* si falla, probamos la vía de navegador */ } }
+    canvas.toBlob((blob) => {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast(tt("rcp_saved_web"));
+    }, "image/png");
+  }
+  function shareReceiptImage(canvas, url, fname) {
+    if (window.RemesasApp && window.RemesasApp.shareImage) { try { window.RemesasApp.shareImage(fname, url.split(",")[1]); return; } catch (e) { /* seguimos abajo */ } }
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], fname, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: tt("rcp_title") }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+      }
+      saveReceiptImage(canvas, url, fname);
+    }, "image/png");
+  }
+  async function openReceipt(o) {
+    if (document.getElementById("rcp-root")) return;
+    const root = document.createElement("div"); root.id = "rcp-root"; root.className = "rcp-overlay";
+    root.innerHTML = `<div class="rcp-sheet"><div class="rcp-body"><div class="hint" id="rcp-loading">${esc(tt("ops_mo_loading"))}</div><img id="rcp-img" alt="${esc(tt("rcp_title"))}" hidden></div>
+      <div class="rcp-actions"><button class="ghost" id="rcp-close">${esc(tt("rcp_close"))}</button><button class="ghost" id="rcp-save">${esc(tt("rcp_save"))}</button><button class="primary" id="rcp-share" style="margin:0">${esc(tt("rcp_share"))}</button></div>
+      <p class="hint rcp-hint">${esc(tt("rcp_hint"))}</p></div>`;
+    document.body.appendChild(root);
+    $("#rcp-close").onclick = () => root.remove();
+    let canvas;
+    try { canvas = await buildReceiptCanvas(o); } catch (e) { console.error("comprobante:", e); $("#rcp-loading").textContent = tt("rcp_err"); return; }
+    const url = canvas.toDataURL("image/png"), fname = "comprobante_" + String(opNum(o.number)).replace("#", "") + ".png";
+    $("#rcp-loading").remove(); const img = $("#rcp-img"); img.src = url; img.hidden = false;
+    $("#rcp-save").onclick = () => saveReceiptImage(canvas, url, fname);
+    $("#rcp-share").onclick = () => shareReceiptImage(canvas, url, fname);
+  }
 
   /* ---------- Cargar una operación anterior (hecha antes de existir la app) ---------- */
   const COUNTRY_NAME = { BR: "Brasil", VE: "Venezuela", AR: "Argentina", ZL: "Zelle", UT: "USDT" };
