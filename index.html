@@ -56,7 +56,7 @@ button{cursor:pointer}
   display:grid;place-items:center;font-size:1.05rem;padding:0 12px}
 
 .top.has-logo{flex-direction:column;justify-content:center;position:relative;gap:4px;margin-bottom:14px}
-.top.has-logo .top-actions{position:absolute;top:0;right:0}
+.top.has-logo .top-actions{order:-1;align-self:flex-end;margin-bottom:2px}
 .logo-img{display:block;width:min(210px,56vw);height:auto;margin:0 auto}
 .top.has-logo .updated{margin:0;font-size:.82rem;text-align:center}
 .file-btn{display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -206,6 +206,40 @@ select:focus,.input:focus{border-color:var(--accent);outline:none}
 .img-overlay img{max-width:100%;max-height:100%;border-radius:10px;display:block}
 .img-overlay-close{position:fixed;top:calc(16px + env(safe-area-inset-top));right:16px;width:44px;height:44px;border-radius:50%;
   background:rgba(255,255,255,.16);color:#fff;border:0;font-size:1.15rem}
+
+/* Menú lateral y pantallas de tasas */
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(82vw,320px);background:var(--surface);z-index:61;padding:16px;
+  display:flex;flex-direction:column;gap:10px;box-shadow:0 0 40px rgba(0,0,0,.35);animation:drawer-in .18s ease-out}
+@keyframes drawer-in{from{transform:translateX(-100%)}to{transform:none}}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-family:var(--display);font-size:1.2rem}
+.drawer-item{min-height:58px;text-align:left;padding:0 16px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface-2);
+  font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:12px}
+.drawer-item:active{background:var(--accent-soft)}
+.rate-top{margin-bottom:14px}
+.rate-title{font-family:var(--display);font-size:1.35rem;margin:0;flex:1;text-align:center}
+.rate-card{margin-bottom:14px}
+.rate-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rate-label{font-weight:700;font-size:1.15rem;padding-top:4px}
+.rate-val{text-align:right}
+.rate-val strong{font-size:1.55rem;font-family:var(--display)}
+.rate-delta{font-size:.95rem;font-weight:600;margin-top:2px}
+.up{color:var(--accent)}.down{color:var(--danger)}.flat{color:var(--muted)}
+.rate-tabs{display:flex;justify-content:space-between;gap:6px;margin-bottom:8px}
+.rate-tabs button{flex:1;min-height:38px;border-radius:999px;border:0;background:transparent;font-weight:700;color:var(--muted)}
+.rate-tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.chart-wrap{touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.chart-wrap svg{width:100%;height:auto;display:block}
+.chart-wrap svg *{pointer-events:none}
+.ch-grid{stroke:var(--line);stroke-width:1}
+.ch-txt{fill:var(--muted);font-size:11px}
+.ch-line{fill:none;stroke-width:2.6;stroke-linejoin:round;stroke-linecap:round}
+.ch-today{stroke:var(--ink);stroke-width:1.2;stroke-dasharray:4 4;opacity:.7}
+.ch-pill{fill:var(--ink)}
+.ch-pill-txt{fill:var(--bg);font-size:12px;font-weight:700}
+.ch-dot{fill:var(--surface);stroke-width:3}
+.rate-date{display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--muted);font-size:.95rem}
+.rate-note{color:var(--muted);font-size:.85rem;margin:10px 4px 0}
 </style>
 </head>
 <body>
@@ -462,6 +496,25 @@ const Core = (function () {
     result_low_amount: { es: "Este monto es menor al mínimo recomendado (mínimo {min}). Si continúas, se aplica una comisión del {newPct}% en lugar del {oldPct}%.",
       pt: "Este valor é menor que o mínimo recomendado (mínimo {min}). Se continuar, será aplicada uma comissão de {newPct}% em vez de {oldPct}%.",
       en: "This amount is below the recommended minimum (minimum {min}). If you continue, a {newPct}% fee applies instead of {oldPct}%." },
+    menu_title: { es: "Menú", pt: "Menu", en: "Menu" },
+    menu_open: { es: "Abrir menú", pt: "Abrir menu", en: "Open menu" },
+    menu_close: { es: "Cerrar", pt: "Fechar", en: "Close" },
+    rate_bcv: { es: "Tasa BCV", pt: "Taxa BCV", en: "BCV rate" },
+    rate_usdt: { es: "Tasa USDT", pt: "Taxa USDT", en: "USDT rate" },
+    rate_eur: { es: "Tasa Euro", pt: "Taxa Euro", en: "Euro rate" },
+    rate_label_usd: { es: "Dólar", pt: "Dólar", en: "Dollar" },
+    rate_label_eur: { es: "Euro", pt: "Euro", en: "Euro" },
+    rate_label_usdt: { es: "USDT", pt: "USDT", en: "USDT" },
+    rate_today: { es: "Hoy", pt: "Hoje", en: "Today" },
+    rate_selected_date: { es: "Fecha seleccionada: {date}", pt: "Data selecionada: {date}", en: "Selected date: {date}" },
+    rate_loading: { es: "Cargando tasas…", pt: "Carregando taxas…", en: "Loading rates…" },
+    rate_error: { es: "No se pudieron cargar las tasas. Revisa tu conexión e inténtalo de nuevo.", pt: "Não foi possível carregar as taxas. Verifique sua conexão e tente novamente.", en: "Couldn't load the rates. Check your connection and try again." },
+    rate_retry: { es: "Reintentar", pt: "Tentar novamente", en: "Retry" },
+    rate_no_data: { es: "Todavía no hay datos para este período.", pt: "Ainda não há dados para este período.", en: "There's no data for this period yet." },
+    rate_source_bcv: { es: "Fuente: tasa oficial publicada por el Banco Central de Venezuela.", pt: "Fonte: taxa oficial publicada pelo Banco Central da Venezuela.", en: "Source: official rate published by the Central Bank of Venezuela." },
+    rate_source_usdt: { es: "Referencia del mercado USDT/VES. Es informativa y cambia durante el día.", pt: "Referência do mercado USDT/VES. É informativa e muda ao longo do dia.", en: "USDT/VES market reference. Informational only; it changes during the day." },
+    rate_usdt_own: { es: "Aún no hay historial del mercado. Mostrando la tasa de referencia de esta app; la gráfica se irá llenando desde hoy.", pt: "Ainda não há histórico do mercado. Mostrando a taxa de referência deste app; o gráfico será preenchido a partir de hoje.", en: "No market history yet. Showing this app's reference rate; the chart will fill in from today." },
+    rate_range_1y: { es: "1A", pt: "1A", en: "1Y" },
     footer_follow_us: { es: "Síguenos", pt: "Siga-nos", en: "Follow us" },
     fab_chat: { es: "Conversa con nosotros", pt: "Fale conosco", en: "Chat with us" },
     err_select_countries: { es: "Selecciona el país de origen y de destino.", pt: "Selecione o país de origem e de destino.", en: "Select the origin and destination country." },
@@ -1125,6 +1178,7 @@ if (typeof module !== "undefined") module.exports = Core;
           <div><h1>${esc(STATE.business.name || "Remesas")}</h1>
           <p class="muted">${esc(updated)}</p></div></div>`}
         <div class="top-actions">
+          <button class="icon-btn" id="menu-btn" aria-label="${esc(tt("menu_open"))}">☰</button>
           <button class="icon-btn" id="lang" aria-label="Language / Idioma">${LANG_LABEL[ui.lang]}</button>
           ${window.RemesasOps ? '<button class="icon-btn" id="myops-btn" aria-label="Mis operaciones">📋</button>' : ""}
           <button class="icon-btn" id="theme" aria-label="Cambiar tema claro u oscuro">◐</button>
@@ -1153,6 +1207,7 @@ if (typeof module !== "undefined") module.exports = Core;
 
     $("#theme").onclick = cycleTheme;
     $("#lang").onclick = cycleLang;
+    $("#menu-btn").onclick = openMenu;
     bindFab();
     if ($("#myops-btn")) $("#myops-btn").onclick = () => window.RemesasOps.openMyOps();
     maybeShowUpdateBanner();
@@ -1714,6 +1769,166 @@ if (typeof module !== "undefined") module.exports = Core;
       }
     };
   }
+
+  /* =================== TASAS: MENÚ Y GRÁFICAS =================== */
+  var RATE_KINDS = {
+    bcv:  { titleKey: "rate_bcv",  labelKey: "rate_label_usd",  series: "usd",  dec: 4, color: "var(--accent)", src: "rate_source_bcv",  icon: "💵" },
+    usdt: { titleKey: "rate_usdt", labelKey: "rate_label_usdt", series: "usdt", dec: 2, color: "#E0A100",       src: "rate_source_usdt", icon: "🪙" },
+    eur:  { titleKey: "rate_eur",  labelKey: "rate_label_eur",  series: "eur",  dec: 4, color: "#4C8DFF",       src: "rate_source_bcv",  icon: "💶" }
+  };
+  var RATE_RANGES = [["7", "7D"], ["30", "1M"], ["90", "3M"], ["180", "6M"], ["365", "1Y"]];
+  var tasasCache = null;
+
+  function veToday() { return new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10); } // Venezuela: UTC-4, sin horario de verano
+  function dayShift(iso, n) { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function fmtNum(n, dec) {
+    const s = Math.abs(n).toFixed(dec), parts = s.split(".");
+    return (n < 0 && Number(s) !== 0 ? "-" : "") + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".") + (parts[1] ? "," + parts[1] : "");
+  }
+  function fmtPct(p) { const s = Math.abs(p).toFixed(2).replace(/0+$/, "").replace(/\.$/, ""); return (p < 0 && Number(s) !== 0 ? "-" : "") + s.replace(".", ","); }
+  function fmtDay(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(2, 4); }
+
+  function openMenu() {
+    if (document.getElementById("menu-root")) return;
+    const root = document.createElement("div"); root.id = "menu-root";
+    root.innerHTML = `<div class="drawer-backdrop" id="menu-bd"></div>
+      <nav class="drawer" role="dialog" aria-label="${esc(tt("menu_title"))}">
+        <div class="drawer-head"><strong>${esc(tt("menu_title"))}</strong><button class="icon-btn" id="menu-close" aria-label="${esc(tt("menu_close"))}">✕</button></div>
+        ${["bcv", "usdt", "eur"].map((k) => `<button class="drawer-item" data-kind="${k}"><span aria-hidden="true">${RATE_KINDS[k].icon}</span><span>${esc(tt(RATE_KINDS[k].titleKey))}</span></button>`).join("")}
+      </nav>`;
+    document.body.appendChild(root);
+    const close = () => root.remove();
+    root.querySelector("#menu-bd").onclick = close; root.querySelector("#menu-close").onclick = close;
+    Array.prototype.forEach.call(root.querySelectorAll(".drawer-item"), (b) => (b.onclick = () => { close(); renderRates(b.dataset.kind); }));
+  }
+
+  function loadTasas() {
+    if (tasasCache && Date.now() - tasasCache.at < 5 * 60 * 1000) return Promise.resolve(tasasCache.data);
+    return fetch("./tasas.json?t=" + Date.now(), { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then((d) => { tasasCache = { data: d, at: Date.now() }; return d; });
+  }
+  function rateSeries(kind, data) {
+    const k = RATE_KINDS[kind];
+    let pts = ((data && data[k.series]) || []).map((a) => ({ d: a[0], v: Number(a[1]) })).filter((p) => isFinite(p.v) && p.v > 0);
+    let own = false;
+    if (kind === "usdt" && !pts.length) { // sin historial del mercado todavía: se muestra la tasa propia de la app
+      const v = Number(STATE.rates.USDT_VES && STATE.rates.USDT_VES.value);
+      if (isFinite(v) && v > 0) { pts = [{ d: veToday(), v }]; own = true; }
+    }
+    return { pts, own };
+  }
+
+  function renderRates(kind) {
+    if (kind) { ui.rateKind = kind; ui.rateRange = ui.rateRange || "30"; ui.rateSel = null; }
+    if (ui.view !== "rates") { try { history.pushState({ rates: 1 }, ""); } catch (e) { /* sin historial: el botón ← igual funciona */ } }
+    ui.view = "rates";
+    drawRatesShell("loading");
+    loadTasas().then((data) => { if (ui.view === "rates") { ui.rateData = data; drawRatesShell("ready"); } })
+      .catch(() => { if (ui.view === "rates") drawRatesShell("error"); });
+    window.scrollTo(0, 0);
+  }
+  function leaveRates() { if (history.state && history.state.rates) history.back(); else renderCalc(); }
+
+  function drawRatesShell(state) {
+    const k = RATE_KINDS[ui.rateKind];
+    const body = state === "loading" ? `<div class="card rate-card"><div class="hint" style="margin:0">${esc(tt("rate_loading"))}</div></div>`
+      : state === "error" ? `<div class="alert" style="margin-bottom:12px">${esc(tt("rate_error"))}</div><button class="primary" id="rate-retry">${esc(tt("rate_retry"))}</button>`
+      : `<div id="rate-body"></div>`;
+    app.innerHTML = `
+      <header class="top rate-top">
+        <button class="icon-btn" id="rate-back" aria-label="${esc(tt("ops_back"))}">←</button>
+        <h1 class="rate-title">${esc(tt(k.titleKey))}</h1>
+        <span style="width:44px;flex:none"></span>
+      </header>${body}`;
+    $("#rate-back").onclick = leaveRates;
+    if ($("#rate-retry")) $("#rate-retry").onclick = () => { tasasCache = null; renderRates(); };
+    if (state === "ready") drawRatesBody();
+  }
+
+  /** Dibuja la gráfica (SVG) y devuelve el HTML fijo más una función que pinta solo el punto seleccionado. */
+  function buildChart(pts, todayIdx, k) {
+    const W = 340, H = 212, L = 6, R = 44, T = 34, B = 28, n = pts.length, iw = W - L - R, ih = H - T - B;
+    const X = (i) => L + (n === 1 ? iw / 2 : (i * iw) / (n - 1));
+    let min = Math.min.apply(null, pts.map((p) => p.v)), max = Math.max.apply(null, pts.map((p) => p.v));
+    if (max - min < 1e-9) { min -= 1; max += 1; }
+    const pad = (max - min) * 0.1; min -= pad; max += pad;
+    const Y = (v) => T + ih * (1 - (v - min) / (max - min));
+    const span = max - min, ld = span > 3 ? 0 : 1; // pocos decimales para que la etiqueta quepa en el eje
+    let grid = "";
+    for (let g = 0; g < 4; g++) {
+      const v = max - (span * g) / 3, yy = Y(v).toFixed(1);
+      grid += `<line class="ch-grid" x1="${L}" x2="${W - R + 6}" y1="${yy}" y2="${yy}"/><text class="ch-txt" x="${W - R + 10}" y="${(Number(yy) + 4).toFixed(1)}">${fmtNum(v, ld)}</text>`;
+    }
+    const seg = (a, b) => pts.slice(a, b + 1).map((p, j) => (j ? "L" : "M") + X(a + j).toFixed(1) + " " + Y(p.v).toFixed(1)).join("");
+    let lines = `<path class="ch-line" style="stroke:${k.color}" d="${seg(0, todayIdx)}"/>`;
+    if (todayIdx < n - 1) lines += `<path class="ch-line" style="stroke:${k.color}" stroke-dasharray="3 6" d="${seg(todayIdx, n - 1)}"/>`;
+    const long = n > 120, lab = (iso) => (long ? iso.slice(5, 7) + "/" + iso.slice(2, 4) : iso.slice(8, 10) + "/" + iso.slice(5, 7));
+    const xl = `<text class="ch-txt" x="${L}" y="${H - 8}">${lab(pts[0].d)}</text><text class="ch-txt" x="${W - R + 6}" y="${H - 8}" text-anchor="end">${lab(pts[n - 1].d)}</text>`;
+    const tx = X(todayIdx), ty = Y(pts[todayIdx].v), px = Math.min(Math.max(tx - 22, 0), W - 44);
+    const today = `<line class="ch-today" x1="${tx.toFixed(1)}" x2="${tx.toFixed(1)}" y1="${T - 6}" y2="${H - B}"/>
+      <rect class="ch-pill" x="${px.toFixed(1)}" y="4" width="44" height="22" rx="8"/>
+      <text class="ch-pill-txt" x="${(px + 22).toFixed(1)}" y="19" text-anchor="middle">${esc(tt("rate_today"))}</text>
+      <circle class="ch-dot" style="stroke:${k.color}" cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="5.5"/>`;
+    return {
+      W, L, R,
+      html: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(tt(k.titleKey))}">${grid}${lines}${xl}${today}<g id="ch-sel"></g></svg>`,
+      selHtml: (i) => {
+        if (i === todayIdx) return "";
+        const sx = X(i).toFixed(1);
+        return `<line class="ch-grid" style="stroke:var(--muted)" x1="${sx}" x2="${sx}" y1="${T - 6}" y2="${H - B}"/><circle class="ch-dot" style="stroke:${k.color}" cx="${sx}" cy="${Y(pts[i].v).toFixed(1)}" r="5.5"/>`;
+      }
+    };
+  }
+
+  function drawRatesBody() {
+    const k = RATE_KINDS[ui.rateKind], box = $("#rate-body"); if (!box) return;
+    const rs = rateSeries(ui.rateKind, ui.rateData), all = rs.pts;
+    if (!all.length) { box.innerHTML = `<div class="card rate-card"><div class="hint" style="margin:0">${esc(tt("rate_no_data"))}</div></div><p class="rate-note">${esc(tt(k.src))}</p>`; return; }
+    const today = veToday(), cut = dayShift(today, -Number(ui.rateRange || 30));
+    const pts = all.filter((p) => p.d >= cut);
+    let todayIdx = -1; pts.forEach((p, i) => { if (p.d <= today) todayIdx = i; });
+    if (todayIdx < 0) todayIdx = 0;
+    const chart = pts.length ? buildChart(pts, todayIdx, k) : null;
+
+    box.innerHTML = `
+      <div class="card rate-card"><div class="rate-row" id="rate-info"></div></div>
+      <div class="card rate-card">
+        <div class="rate-tabs" role="tablist">${RATE_RANGES.map((r) => `<button data-r="${r[0]}" role="tab" aria-selected="${ui.rateRange === r[0]}">${r[0] === "365" ? esc(tt("rate_range_1y")) : r[1]}</button>`).join("")}</div>
+        <div class="chart-wrap" id="chart-box">${chart ? chart.html : `<div class="hint" style="margin:8px 0">${esc(tt("rate_no_data"))}</div>`}</div>
+        <div class="rate-date" id="rate-date"></div>
+      </div>
+      <p class="rate-note">${esc(tt(k.src))}</p>${rs.own ? `<p class="rate-note">${esc(tt("rate_usdt_own"))}</p>` : ""}`;
+
+    const paint = () => {
+      const list = pts.length ? pts : all;
+      let sel = ui.rateSel == null || ui.rateSel >= list.length ? (pts.length ? todayIdx : list.length - 1) : ui.rateSel;
+      const cur = list[sel], gi = all.findIndex((p) => p.d === cur.d), prev = gi > 0 ? all[gi - 1] : null;
+      const delta = prev ? cur.v - prev.v : null, pct = prev ? (delta / prev.v) * 100 : null;
+      const dir = delta == null || Math.abs(delta) < 0.00005 ? "flat" : delta > 0 ? "up" : "down";
+      $("#rate-info").innerHTML = `<div class="rate-label">${esc(tt(k.labelKey))}</div>
+        <div class="rate-val ${dir}"><strong>${dir === "up" ? "↑ " : dir === "down" ? "↓ " : ""}<span style="color:var(--ink)">${esc(fmtNum(cur.v, k.dec))} Bs</span></strong>
+        ${delta == null ? "" : `<div class="rate-delta">${delta > 0.00005 ? "+" : ""}${esc(fmtNum(delta, 2))} Bs (${esc(fmtPct(pct))}%)</div>`}</div>`;
+      $("#rate-date").innerHTML = `<span aria-hidden="true">📅</span><span>${esc(tt("rate_selected_date", { date: fmtDay(cur.d) }))}</span>`;
+      if (chart && $("#ch-sel")) $("#ch-sel").innerHTML = chart.selHtml(sel);
+    };
+    paint();
+
+    Array.prototype.forEach.call(box.querySelectorAll(".rate-tabs button"), (b) => (b.onclick = () => { ui.rateRange = b.dataset.r; ui.rateSel = null; drawRatesBody(); }));
+    const cb = $("#chart-box");
+    if (chart && cb) {
+      const pick = (e) => {
+        const svg = cb.querySelector("svg"); if (!svg) return;
+        const r = svg.getBoundingClientRect(), x = ((e.clientX - r.left) / r.width) * chart.W;
+        const i = pts.length === 1 ? 0 : Math.round(((x - chart.L) / (chart.W - chart.L - chart.R)) * (pts.length - 1));
+        ui.rateSel = Math.max(0, Math.min(pts.length - 1, i)); paint();
+      };
+      cb.addEventListener("pointerdown", pick);
+      cb.addEventListener("pointermove", (e) => { if (e.buttons || e.pointerType === "touch") pick(e); });
+    }
+  }
+
+  window.addEventListener("popstate", () => { if (ui.view === "rates") renderCalc(); });
 
   window.RemesasCalc = {
     renderCalc, getLang: () => ui.lang,
