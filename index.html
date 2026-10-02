@@ -6,12 +6,13 @@
 <title>Calculadora de remesas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;600;700&display=swap" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;600;700&display=swap"></noscript>
 <link id="app-head-extra" rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%92%B1%3C%2Ftext%3E%3C%2Fsvg%3E">
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js">
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js">
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js">
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js">
 <style id="app-style">:root{
   --bg:#E6ECE9; --surface:#FFFFFF; --surface-2:#F3F6F4; --ink:#15201C; --muted:#5A6A64;
   --line:#CAD5D0; --accent:#0B6E4F; --accent-ink:#FFFFFF; --accent-soft:#D6EDE4;
@@ -2057,7 +2058,7 @@ if (typeof module !== "undefined") module.exports = Core;
   })();
 })();
 </script>
-<script id="app-ops">/* =====================================================================
+<script type="text/plain" id="app-ops">/* =====================================================================
  * MÓDULO DE OPERACIONES (Firebase)
  * ---------------------------------------------------------------------
  * Se agrega SOBRE la calculadora existente, sin tocar cómo funcionan las
@@ -2086,6 +2087,7 @@ if (typeof module !== "undefined") module.exports = Core;
   }
   const auth = fb.auth();
   const db = fb.firestore();
+  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* versión sin esta opción */ }
   const ADMIN_UIDS = CONFIG.firebaseAdmins || [];
   // WhatsApp oficial: el botón "Compartir por WhatsApp" siempre escribe a este número.
   const OFFICIAL_WA = (CONFIG.officialWhatsApp || "https://wa.me/").replace(/\/$/, "");
@@ -3567,5 +3569,66 @@ function screenDone(app) {
   };
 })();
 </script>
+<script id="fb-loader">
+/* Carga Firebase en segundo plano: la calculadora aparece primero y las operaciones se activan cuando hay conexión. */
+(function () {
+  var BASE = window.__FB_BASE__ || "https://www.gstatic.com/firebasejs/10.13.2/";
+  var MODS = ["app", "app-check", "auth", "firestore"];
+  var MSG = {
+    es: { slow: "Conectando… la conexión está lenta.", fail: "Sin conexión con el servidor. La calculadora funciona, pero algunas funciones no están disponibles.", retry: "Reintentar" },
+    pt: { slow: "Conectando… a conexão está lenta.", fail: "Sem conexão com o servidor. A calculadora funciona, mas algumas funções não estão disponíveis.", retry: "Tentar novamente" },
+    en: { slow: "Connecting… the connection is slow.", fail: "No connection to the server. The calculator works, but some features are unavailable.", retry: "Retry" }
+  };
+  var loaded = {}, running = false, ran = false, note = null, slowTimer = null;
+  function lang() { try { var l = window.RemesasCalc.getLang(); return MSG[l] ? l : "es"; } catch (e) { return "es"; } }
+  function show(kind) {
+    if (ran) return;
+    if (!note) {
+      note = document.createElement("div"); note.id = "conn-note"; note.setAttribute("role", "status");
+      note.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:90;background:#FFF1D6;color:#5a3b00;border:1px solid #E5C77A;border-radius:12px;padding:10px 12px;font:600 .9rem system-ui,sans-serif;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 4px 18px rgba(0,0,0,.15)";
+      document.body.appendChild(note);
+    }
+    var m = MSG[lang()]; note.innerHTML = "";
+    var t = document.createElement("span"); t.textContent = kind === "fail" ? m.fail : m.slow; note.appendChild(t);
+    if (kind === "fail") {
+      var b = document.createElement("button"); b.textContent = m.retry;
+      b.style.cssText = "flex:none;border:0;border-radius:10px;padding:8px 12px;font-weight:700;background:#0B6E4F;color:#fff";
+      b.onclick = function () { start(); }; note.appendChild(b);
+    }
+  }
+  function hide() { if (note) { note.remove(); note = null; } }
+  function loadOne(i, attempt, cb) {
+    if (loaded[i]) return cb(true);
+    var s = document.createElement("script"), done = false, to;
+    function finish(ok) {
+      if (done) return; done = true; clearTimeout(to);
+      if (ok) { loaded[i] = true; cb(true); return; }
+      s.remove();
+      if (attempt < 3) setTimeout(function () { loadOne(i, attempt + 1, cb); }, 1200 * attempt); else cb(false);
+    }
+    to = setTimeout(function () { finish(false); }, 20000);
+    s.async = false; s.src = BASE + "firebase-" + MODS[i] + "-compat.js";
+    s.onload = function () { finish(true); }; s.onerror = function () { finish(false); };
+    document.head.appendChild(s);
+  }
+  function runOps() {
+    if (ran) return; ran = true; clearTimeout(slowTimer); hide();
+    var s = document.createElement("script"); s.text = document.getElementById("app-ops").textContent; document.body.appendChild(s);
+  }
+  function start() {
+    if (running || ran) return; running = true;
+    clearTimeout(slowTimer); slowTimer = setTimeout(function () { show("slow"); }, 5000);
+    (function next(i) {
+      if (i >= MODS.length) { running = false; return runOps(); }
+      loadOne(i, 1, function (ok) { if (ok) next(i + 1); else { running = false; clearTimeout(slowTimer); show("fail"); } });
+    })(0);
+  }
+  window.addEventListener("online", start);
+  setInterval(function () { if (!ran && !running && navigator.onLine !== false) start(); }, 30000);
+  start();
+  if ("serviceWorker" in navigator) window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });
+})();
+</script>
+
 </body>
 </html>
