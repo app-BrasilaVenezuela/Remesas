@@ -179,7 +179,7 @@ select:focus,.input:focus{border-color:var(--accent);outline:none}
 .savebar .in{max-width:560px;margin:0 auto;display:flex;gap:10px;align-items:center}
 .savebar .msg{flex:1;font-size:.88rem;color:var(--muted)}
 .savebar .primary{margin:0;width:auto;padding:0 20px;min-height:50px}
-.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;z-index:10;max-width:90vw}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;z-index:200;max-width:90vw}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 @media (min-width:700px){.wrap{padding-top:32px}}
@@ -529,6 +529,8 @@ const Core = (function () {
     rcp_save: { es: "Guardar", pt: "Salvar", en: "Save" },
     rcp_share: { es: "Compartir", pt: "Compartilhar", en: "Share" },
     rcp_close: { es: "Cerrar", pt: "Fechar", en: "Close" },
+    rcp_old_app: { es: "Tu versión de la app es antigua y no puede guardar ni compartir imágenes. Actualízala, o toma una captura de pantalla.", pt: "Sua versão do app é antiga e não consegue salvar nem compartilhar imagens. Atualize-a, ou tire um print da tela.", en: "Your app version is old and can't save or share images. Update it, or take a screenshot." },
+    rcp_update: { es: "Actualizar la app", pt: "Atualizar o app", en: "Update the app" },
     rcp_hint: { es: "También puedes tomar una captura de pantalla.", pt: "Você também pode tirar um print da tela.", en: "You can also take a screenshot." },
     rcp_saved_web: { es: "Imagen descargada", pt: "Imagem baixada", en: "Image downloaded" },
     rcp_err: { es: "No se pudo generar el comprobante.", pt: "Não foi possível gerar o comprovante.", en: "Couldn't generate the receipt." },
@@ -2035,7 +2037,7 @@ if (typeof module !== "undefined") module.exports = Core;
     const div = document.createElement("div");
     div.id = "update-banner"; div.className = "card stack"; div.style.marginBottom = "14px"; div.style.border = "2px solid var(--accent)";
     div.innerHTML = `<div class="hint" style="margin:0">Hay una nueva versión de la app disponible (${esc(latest.versionName || "")}).</div>
-      <div class="grid2"><button class="ghost" id="upd-dismiss">Más tarde</button><a class="primary" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="${esc(latest.apkUrl || "#")}" id="upd-download">Descargar</a></div>`;
+      <div class="grid2"><button class="ghost" id="upd-dismiss">Más tarde</button><a class="primary" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="${esc(latest.apkUrl || "#")}" id="upd-download" target="_blank" rel="noopener">Descargar</a></div>`;
     panel.parentNode.insertBefore(div, panel);
     document.getElementById("upd-dismiss").onclick = () => { store.set("dismissedUpdate", latest.versionCode); div.remove(); };
   }
@@ -3208,7 +3210,14 @@ function screenDone(app) {
     drawReceipt(cv.getContext("2d"), W, d, logo);
     return cv;
   }
+  function showOldAppNotice() {
+    const sheet = document.querySelector("#rcp-root .rcp-sheet"); if (!sheet || sheet.querySelector("#rcp-old")) return;
+    const d = document.createElement("div"); d.id = "rcp-old"; d.className = "alert"; d.style.margin = "10px 0 0";
+    d.innerHTML = `<div>${esc(tt("rcp_old_app"))}</div><a class="primary" style="display:flex;align-items:center;justify-content:center;margin-top:10px;text-decoration:none" href="./Remesas.apk" target="_blank" rel="noopener">${esc(tt("rcp_update"))}</a>`;
+    sheet.insertBefore(d, sheet.querySelector(".rcp-actions"));
+  }
   function saveReceiptImage(canvas, url, fname) {
+    if (window.RemesasApp && !window.RemesasApp.saveImage) { showOldAppNotice(); return; }
     if (window.RemesasApp && window.RemesasApp.saveImage) { try { window.RemesasApp.saveImage(fname, url.split(",")[1]); return; } catch (e) { /* si falla, probamos la vía de navegador */ } }
     canvas.toBlob((blob) => {
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname; document.body.appendChild(a); a.click(); a.remove();
@@ -3216,6 +3225,7 @@ function screenDone(app) {
     }, "image/png");
   }
   function shareReceiptImage(canvas, url, fname) {
+    if (window.RemesasApp && !window.RemesasApp.shareImage) { showOldAppNotice(); return; }
     if (window.RemesasApp && window.RemesasApp.shareImage) { try { window.RemesasApp.shareImage(fname, url.split(",")[1]); return; } catch (e) { /* seguimos abajo */ } }
     canvas.toBlob(async (blob) => {
       const file = new File([blob], fname, { type: "image/png" });
