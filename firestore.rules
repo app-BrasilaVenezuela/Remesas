@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // GM = administrador principal (tú). Ve y maneja todo.
+    function isGM() {
+      return request.auth != null && request.auth.uid in ["QeNrK2lts1cSOUqGS3iISVKwbgy2", "UClv6IJtVdbQxfJNnM3DD0dQPMy2"];
+    }
+    function isSignedIn() { return request.auth != null; }
+
+    // Operador = administrador independiente, registrado por el GM en la colección "operators".
+    function isOperator() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != "anonymous"
+        && exists(/databases/$(database)/documents/operators/$(request.auth.uid))
+        && get(/databases/$(database)/documents/operators/$(request.auth.uid)).data.active == true;
+    }
+    function isStaff() { return isGM() || isOperator(); }
+    function activeOperator(uid) {
+      return exists(/databases/$(database)/documents/operators/$(uid))
+        && get(/databases/$(database)/documents/operators/$(uid)).data.active == true;
+    }
+
+    match /operators/{uid} {
+      allow read: if isSignedIn();
+      allow create, delete: if isGM();
+      allow update: if isGM() || (
+        isOperator() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["whatsapp"])
+      );
+    }
+
+    match /operatorAccounts/{id} {
+      allow read: if isSignedIn();
+      allow create: if isGM() || (isOperator() && request.resource.data.operatorUid == request.auth.uid);
+      allow update: if isGM() || (
+        isOperator() && resource.data.operatorUid == request.auth.uid
+        && request.resource.data.operatorUid == request.auth.uid
+      );
+      allow delete: if isGM() || (isOperator() && resource.data.operatorUid == request.auth.uid);
+    }
+
+    match /beneficiaries/{id} {
+      allow read, update, delete: if isGM() || (isSignedIn() && resource.data.clientUid == request.auth.uid);
+      allow create: if isGM() || (isSignedIn() && request.resource.data.clientUid == request.auth.uid);
+    }
+
+    match /operations/{id} {
+      allow read: if isGM()
+        || (isSignedIn() && resource.data.clientUid == request.auth.uid)
+        || (isOperator() && resource.data.operatorUid == request.auth.uid);
+
+      allow create: if isGM()
+        || (isOperator() && request.resource.data.operatorUid == request.auth.uid)
+        || (isSignedIn() && request.resource.data.clientUid == request.auth.uid
+            && request.resource.data.status == "PENDING_PAYMENT"
+            && (!("operatorUid" in request.resource.data)
+                || request.resource.data.operatorUid == "main"
+                || activeOperator(request.resource.data.operatorUid)));
+
+      allow update: if isGM()
+        || (isOperator() && resource.data.operatorUid == request.auth.uid
+            && request.resource.data.operatorUid == request.auth.uid)
+        || (isSignedIn() && resource.data.clientUid == request.auth.uid
+            && resource.data.status in ["PENDING_PAYMENT", "RECEIPT_UPLOADED"]
+            && request.resource.data.clientUid == resource.data.clientUid
+            && request.resource.data.get("operatorUid", "main") == resource.data.get("operatorUid", "main")
+            && request.resource.data.status in ["PENDING_PAYMENT", "RECEIPT_UPLOADED", "CANCELLED"]);
+
+      allow delete: if false;
+    }
+
+    match /meta/opCounter {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.last == 1;
+      allow update: if isStaff() || (isSignedIn() && request.resource.data.last == resource.data.last + 1);
+    }
+  }
+}
