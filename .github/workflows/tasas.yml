@@ -1,1 +1,42 @@
+name: Actualizar tasas
 
+on:
+  schedule:
+    - cron: "7,37 * * * *"      # cada 30 minutos (GitHub puede retrasarlo unos minutos)
+  workflow_dispatch:             # botón "Run workflow" para probarlo a mano
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tasas-auto
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Gráficas (BCV, euro y USDT)
+        run: python scripts/update_tasas.py
+      - name: Tasa BCV de la calculadora
+        continue-on-error: true
+        run: python scripts/bcv_update.py
+      - name: Tasas ligadas al USDT
+        continue-on-error: true
+        run: python scripts/usdt_update.py
+      - name: Guardar cambios
+        run: |
+          if [ -n "$(git status --porcelain tasas.json data.json usdt.json)" ]; then
+            git config user.name "tasas-bot"
+            git config user.email "tasas-bot@users.noreply.github.com"
+            git add tasas.json data.json usdt.json
+            git commit -m "Actualizar tasas"
+            git pull --rebase origin ${{ github.ref_name }}
+            git push
+          else
+            echo "Sin cambios."
+          fi
