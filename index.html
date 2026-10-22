@@ -1378,7 +1378,7 @@ if (typeof module !== "undefined") module.exports = Core;
 
   /** Las pantallas de operaciones (ops.js) dibujan sobre el mismo contenedor: no hay que pisarlas al refrescar datos. */
   function opsBusy() { return !!(window.RemesasOps && window.RemesasOps.isActive && window.RemesasOps.isActive()); }
-  const BUILD_ID = "2026.10.17-b";
+  const BUILD_ID = "2026.10.21-a";
   const USER_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" style="display:block"><circle cx="12" cy="12" r="10.1" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="9.3" r="3.5" fill="currentColor"/><path d="M5.7 18.2c1.2-2.8 3.5-4.3 6.3-4.3s5.1 1.5 6.3 4.3c-1.6 1.9-3.8 3.1-6.3 3.1s-4.7-1.2-6.3-3.1z" fill="currentColor"/></svg>';
   function renderCalc() {
     ui.view = "calc";
@@ -1678,9 +1678,10 @@ if (typeof module !== "undefined") module.exports = Core;
     return { bind: baseIn, html: `<div class="card hero" id="ul-card">
       <h3>🪙 Tasas ligadas al USDT</h3>
       <div class="hint" style="margin:0 0 10px">Cuando el USDT sube o baja, las tasas directas a Venezuela se recalculan con la misma proporción, así conservas tu margen.</div>
-      <div class="seg" role="group" aria-label="Modo" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <button type="button" class="${L.mode === "auto" ? "primary" : "ghost"}" id="ul-mode-auto">⚡ Automático</button>
-        <button type="button" class="${L.mode === "auto" ? "ghost" : "primary"}" id="ul-mode-manual">✋ Manual</button></div>
+      <div class="seg" role="group" aria-label="Modo" style="margin-bottom:10px">
+        <button type="button" id="ul-mode-auto" aria-pressed="${L.mode === "auto"}">⚡ Automático</button>
+        <button type="button" id="ul-mode-manual" aria-pressed="${L.mode !== "auto"}">✋ Manual</button></div>
+      <div class="hint" style="margin:0 0 10px"><b>${L.mode === "auto" ? "Modo automático activado" : "Modo manual activado"}</b></div>
       ${L.mode === "auto" ? `<div class="hint" id="ul-auto-info" style="margin:0 0 8px">Un proceso de GitHub revisa el USDT cada 30 minutos y actualiza las tasas marcadas cuando el cambio supera el umbral. Para pausarlo, pasa a Manual y guarda.</div>
         <label class="field"><span>Actualizar solo si el USDT cambia al menos (%)</span><input class="input" id="ul-thr" inputmode="decimal" autocomplete="off" value="${esc(toInput(L.threshold || "0.5"))}"></label>
         <div class="err" id="ul-thr-err"></div>
